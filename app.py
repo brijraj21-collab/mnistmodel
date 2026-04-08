@@ -8,13 +8,7 @@ import io
 from PIL import Image
 from torchvision import transforms
 from fastapi.middleware.cors import CORSMiddleware
-app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-)
+
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
@@ -33,7 +27,13 @@ class SimpleCNN(nn.Module):
         return F.log_softmax(x, dim=1)
 
 app = Flask(__name__)
-
+app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+)
 # Load weights safely
 device = torch.device("cpu")
 model = SimpleCNN()
