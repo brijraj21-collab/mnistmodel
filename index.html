@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Classifier AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #f8fafc, #f1f5f9);
+        }
+
+        .drop-zone--over {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+
+    <div class="max-w-md w-full glass-card rounded-3xl shadow-2xl p-8 transition-all">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <div class="inline-block p-3 bg-blue-600 rounded-2xl mb-4 shadow-lg shadow-blue-200">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight text-slate-900">Vision<span class="text-blue-600">AI</span></h1>
+            <p class="text-slate-500 mt-2 text-sm">Upload an image to classify it instantly.</p>
+        </header>
+
+        <!-- Upload Area -->
+        <div id="dropZone" class="relative border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-400 transition-all group bg-slate-50/50">
+            <input type="file" id="fileInput" class="hidden" accept="image/*">
+            
+            <div id="uploadPlaceholder">
+                <div class="text-slate-400 group-hover:text-blue-500 transition-colors mb-3">
+                    <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <p class="text-sm font-semibold text-slate-600">Click to upload or drag & drop</p>
+                <p class="text-xs text-slate-400 mt-1">Supports JPG, PNG, WEBP</p>
+            </div>
+
+            <!-- Preview Image (Hidden initially) -->
+            <div id="previewContainer" class="hidden">
+                <img id="imagePreview" class="w-full h-56 object-cover rounded-xl shadow-md border border-white">
+                <button id="changeImg" class="mt-3 text-xs font-semibold text-blue-600 hover:text-blue-800">Change Image</button>
+            </div>
+        </div>
+
+        <!-- Action Button -->
+        <button id="classifyBtn" class="w-full mt-6 bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-blue-600 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-xl shadow-slate-200" disabled>
+            Run Classification
+        </button>
+
+        <!-- Loader & Results Section -->
+        <div id="statusArea" class="mt-8 hidden border-t border-slate-100 pt-6">
+            <div id="loader" class="hidden flex flex-col items-center">
+                <div class="loader mb-3"></div>
+                <p class="text-xs font-medium text-slate-500 animate-pulse">Analyzing visual patterns...</p>
+            </div>
+
+            <div id="resultArea" class="hidden">
+                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">Analysis Result</p>
+                <div class="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                    <div>
+                        <span id="labelResult" class="text-xl font-bold text-slate-800 block">---</span>
+                        <span class="text-[10px] text-slate-400">Predicted Class</span>
+                    </div>
+                    <div class="text-right">
+                        <span id="confidenceResult" class="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block mb-1">0%</span>
+                        <span class="text-[10px] text-slate-400 block">Confidence</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
+        const preview = document.getElementById('imagePreview');
+        const previewContainer = document.getElementById('previewContainer');
+        const placeholder = document.getElementById('uploadPlaceholder');
+        const classifyBtn = document.getElementById('classifyBtn');
+        const statusArea = document.getElementById('statusArea');
+        const resultArea = document.getElementById('resultArea');
+        const loader = document.getElementById('loader');
+        const labelResult = document.getElementById('labelResult');
+        const confidenceResult = document.getElementById('confidenceResult');
+        const changeImg = document.getElementById('changeImg');
+
+        // Setup: API endpoint (Change this to your actual backend URL)
+        const API_ENDPOINT = 'https://mnit-day3-model.onrender.com';
+
+        // Drag and Drop handlers
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drop-zone--over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drop-zone--over'), false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }, false);
+
+        dropZone.onclick = (e) => {
+            if(e.target !== changeImg) fileInput.click();
+        };
+
+        changeImg.onclick = (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        };
+
+        fileInput.onchange = (e) => handleFiles(e.target.files);
+
+        function handleFiles(files) {
+            const file = files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.src = e.target.result;
+                    previewContainer.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                    classifyBtn.disabled = false;
+                    statusArea.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Handle Classification Logic
+        classifyBtn.onclick = async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file); // 'file' is the key your backend usually expects
+
+            // UI Transitions
+            classifyBtn.disabled = true;
+            statusArea.classList.remove('hidden');
+            loader.classList.remove('hidden');
+            resultArea.classList.add('hidden');
+
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+
+                const data = await response.json();
+
+                // Assumes response format: { "label": "String", "confidence": 0.95 }
+                labelResult.innerText = data.label || 'Unknown';
+                const confValue = data.confidence ? (data.confidence * 100).toFixed(1) : '0';
+                confidenceResult.innerText = confValue + '%';
+                
+                loader.classList.add('hidden');
+                resultArea.classList.remove('hidden');
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Connection Error: Make sure your backend API is running at ' + API_ENDPOINT + ' and has CORS enabled.');
+                statusArea.classList.add('hidden');
+            } finally {
+                classifyBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
